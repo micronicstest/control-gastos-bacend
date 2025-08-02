@@ -168,8 +168,8 @@ function renderTabla() {
   const filtradas = transacciones.filter((t) => {
     return (
       (nombreFiltro === "todos" || t.username === nombreFiltro) &&
-      (tipoFiltro === "todos" || t.Tipo === tipoFiltro) &&
-      (!fechaFiltro || t.Fecha === fechaFiltro)
+      (tipoFiltro === "todos" || t.tipo === tipoFiltro) &&
+      (!fechaFiltro || t.fecha === fechaFiltro)
     );
   });
 
