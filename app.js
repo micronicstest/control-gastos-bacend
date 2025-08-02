@@ -1,4 +1,4 @@
-const API_URL = "https://control-gastos-backend.onrender.com";
+const API_URL = "https://control-gastos-backend-tj2z.onrender.com";
 
 let token = "";
 let transacciones = [];
