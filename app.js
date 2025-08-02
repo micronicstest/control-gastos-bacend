@@ -1,4 +1,5 @@
-const API_URL = "http://localhost:8000";
+const API_URL = "https://control-gastos-backend.onrender.com";
+
 let token = "";
 let transacciones = [];
 
