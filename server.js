@@ -10,11 +10,11 @@ const app = express();
 
 // --- Configuración de MariaDB ---
 const dbConfig = {
-  host: "208.91.198.79", // o el host que te indique tu proveedor
-  user: "techteig_wp373",
-  password: "techteig_wp373/*", // la que configuraste en cPanel
-  database: "techteig_control_gastos",
-  port: 3306,
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT || 3306,
 };
 
 let db;
