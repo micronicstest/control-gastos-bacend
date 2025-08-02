@@ -1,7 +1,11 @@
 const API_URL = "https://control-gastos-backend-tj2z.onrender.com";
-
 let token = "";
 let transacciones = [];
+
+// --- PING para mantener backend activo cada 5 minutos ---
+setInterval(() => {
+  fetch(`${API_URL}/login`).catch(() => {});
+}, 1000 * 60 * 5); // cada 5 minutos
 
 // --- Elementos del DOM ---
 const modal = document.getElementById("loginModal");
