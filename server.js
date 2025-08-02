@@ -81,11 +81,11 @@ app.post("/login", async (req, res) => {
 app.get("/transacciones", authenticateToken, async (req, res) => {
   try {
     let query = `
-  SELECT 
-    t.id, t.tipo, t.monto, t."Descripción" AS descripcion, t.fecha, u.username 
-  FROM transacciones t 
-  JOIN usuarios u ON t.usuario_id = u.id
-`;
+      SELECT 
+        t.id, t.tipo, t.monto, t.descripcion, t.fecha, u.username 
+      FROM transacciones t 
+      JOIN usuarios u ON t.usuario_id = u.id
+    `;
     const params = [];
 
     if (req.user.rol !== "admin") {
@@ -140,7 +140,7 @@ app.put("/transacciones/:id", authenticateToken, async (req, res) => {
 
     const result = await pool.query(
       `UPDATE transacciones 
-       SET tipo = $1, monto = $2, "Descripción" = $3, fecha = $4 
+       SET tipo = $1, monto = $2, descripcion = $3, fecha = $4 
        WHERE id = $5 AND usuario_id = $6`,
       [tipo, monto, descripcion, fecha, id, req.user.id]
     );

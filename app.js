@@ -5,7 +5,7 @@ let transacciones = [];
 // --- PING para mantener backend activo cada 5 minutos ---
 setInterval(() => {
   fetch(`${API_URL}/login`).catch(() => {});
-}, 1000 * 60 * 5); // cada 5 minutos
+}, 1000 * 60 * 5);
 
 // --- Elementos del DOM ---
 const modal = document.getElementById("loginModal");
@@ -22,12 +22,8 @@ const transactionTable = document.querySelector("#transaction-table tbody");
 const filtroNombre = document.getElementById("filtroNombre");
 const filtroTipo = document.getElementById("filtroTipo");
 const filtroFecha = document.getElementById("date");
-const pieChartCanvas = document.getElementById("pieChart");
-const barChartCanvas = document.getElementById("barChart");
-const diferenciaDiv = document.getElementById("diferencia");
 const campoFecha = document.getElementById("transactionDate");
 
-// Modal de edición
 const editModal = document.getElementById("editModal");
 const editDescripcion = document.getElementById("editDescripcion");
 const editMonto = document.getElementById("editMonto");
@@ -35,12 +31,10 @@ const editTipo = document.getElementById("editTipo");
 const editFecha = document.getElementById("editFecha");
 const guardarEdicion = document.getElementById("guardarEdicion");
 const cancelarEdicion = document.getElementById("cancelarEdicion");
+
 let transaccionEditando = null;
+let rolUsuario = "";
 
-let pieChart, barChart;
-let rolUsuario = ""; // para saber si es admin o usuario
-
-// --- Manejo de modales ---
 abrirLogin.onclick = () => (modal.style.display = "flex");
 cerrarModal.onclick = () => (modal.style.display = "none");
 cancelarEdicion.onclick = () => {
@@ -48,7 +42,6 @@ cancelarEdicion.onclick = () => {
   transaccionEditando = null;
 };
 
-// --- Login ---
 btnLogin.onclick = async () => {
   const username = usernameInput.value.trim();
   const password = passwordInput.value.trim();
@@ -81,14 +74,12 @@ btnLogin.onclick = async () => {
   }
 };
 
-// --- Cerrar sesión ---
 cerrarSesionBtn.onclick = () => {
   localStorage.removeItem("token");
   token = "";
   location.reload();
 };
 
-// --- Mostrar Dashboard ---
 function mostrarDashboard() {
   document.getElementById("transaction-form").style.display = "flex";
   document.querySelector(".filtros").style.display = "block";
@@ -97,24 +88,16 @@ function mostrarDashboard() {
   abrirLogin.style.display = "none";
 }
 
-// --- Cargar Transacciones ---
 async function cargarTransacciones() {
   try {
     const res = await fetch(`${API_URL}/transacciones`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) throw new Error(`Error ${res.status}`);
-    transacciones = await res.json();
-    transacciones = transacciones.map((t) => ({
-      ...t,
-      Monto: Number(t.monto) || 0,
-    }));
-    // Detectar rol del usuario actual (admin o usuario)
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    rolUsuario = payload.rol;
 
+    transacciones = await res.json();
+    rolUsuario = JSON.parse(atob(token.split(".")[1])).rol;
     renderTabla();
-    actualizarGraficos();
   } catch (err) {
     console.error("Error al cargar transacciones:", err);
     if (err.message.includes("401") || err.message.includes("403")) {
@@ -126,20 +109,14 @@ async function cargarTransacciones() {
   }
 }
 
-// --- Agregar Transacción ---
 transactionForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-
-  const fechaSeleccionada =
-    campoFecha.value || new Date().toISOString().split("T")[0];
-
   const nueva = {
     tipo: document.getElementById("type").value,
     monto: parseFloat(document.getElementById("amount").value),
     descripcion: document.getElementById("description").value,
-    fecha: fechaSeleccionada,
+    fecha: campoFecha.value || new Date().toISOString().split("T")[0],
   };
-
   try {
     const res = await fetch(`${API_URL}/transacciones`, {
       method: "POST",
@@ -154,40 +131,35 @@ transactionForm.addEventListener("submit", async (e) => {
     transactionForm.reset();
   } catch (err) {
     console.error("Error al agregar transacción:", err);
-    alert("No se pudo agregar, porque eres administrador, solo deysy y gerald");
+    alert("No se pudo agregar la transacción.");
   }
 });
 
-// --- Renderizar Tabla ---
 function renderTabla() {
   transactionTable.innerHTML = "";
-  const nombreFiltro = filtroNombre.value;
-  const tipoFiltro = filtroTipo.value;
-  const fechaFiltro = filtroFecha.value;
-
   const filtradas = transacciones.filter((t) => {
     return (
-      (nombreFiltro === "todos" || t.username === nombreFiltro) &&
-      (tipoFiltro === "todos" || t.tipo === tipoFiltro) &&
-      (!fechaFiltro || t.fecha === fechaFiltro)
+      (filtroNombre.value === "todos" || t.username === filtroNombre.value) &&
+      (filtroTipo.value === "todos" || t.tipo === filtroTipo.value) &&
+      (!filtroFecha.value || t.fecha === filtroFecha.value)
     );
   });
 
   filtradas.forEach((t) => {
-    const fechaFormateada = new Date(t.fecha).toISOString().split("T")[0];
     const row = document.createElement("tr");
+    const fecha = new Date(t.fecha).toISOString().split("T")[0];
     row.innerHTML = `
       <td>${t.username || "Usuario"}</td>
       <td>${t.tipo}</td>
       <td>S/ ${t.monto.toFixed(2)}</td>
       <td>${t.descripcion}</td>
-      <td>${fechaFormateada}</td>
+      <td>${fecha}</td>
       <td>
         ${
-          rolUsuario === "admin"
-            ? ""
-            : `<button class="editar" data-id="${t.Id}">✏️</button>
-               <button class="eliminar" data-id="${t.Id}">🗑️</button>`
+          rolUsuario !== "admin"
+            ? `<button class="editar" data-id="${t.id}">✏️</button>
+               <button class="eliminar" data-id="${t.id}">🗑️</button>`
+            : ""
         }
       </td>
     `;
@@ -198,14 +170,12 @@ function renderTabla() {
     document.querySelectorAll(".eliminar").forEach((btn) => {
       btn.addEventListener("click", () => eliminarTransaccion(btn.dataset.id));
     });
-
     document.querySelectorAll(".editar").forEach((btn) => {
       btn.addEventListener("click", () => abrirEdicion(btn.dataset.id));
     });
   }
 }
 
-// --- Eliminar Transacción ---
 async function eliminarTransaccion(id) {
   try {
     const res = await fetch(`${API_URL}/transacciones/${id}`, {
@@ -216,34 +186,28 @@ async function eliminarTransaccion(id) {
     await cargarTransacciones();
   } catch (err) {
     console.error("Error al eliminar:", err);
-    alert("No se pudo eliminar la transacción.");
   }
 }
 
-// --- Editar Transacción ---
 function abrirEdicion(id) {
-  const transaccion = transacciones.find((t) => t.Id == id);
-  if (!transaccion) return;
-
+  const t = transacciones.find((x) => x.id == id);
+  if (!t) return;
   transaccionEditando = id;
-  editDescripcion.value = transaccion.Descripción;
-  editMonto.value = transaccion.Monto;
-  editTipo.value = transaccion.Tipo;
-  editFecha.value = transaccion.Fecha;
-
+  editDescripcion.value = t.descripcion;
+  editMonto.value = t.monto;
+  editTipo.value = t.tipo;
+  editFecha.value = t.fecha;
   editModal.style.display = "flex";
 }
 
 guardarEdicion.onclick = async () => {
   if (!transaccionEditando) return;
-
   const cambios = {
     descripcion: editDescripcion.value,
     monto: parseFloat(editMonto.value),
     tipo: editTipo.value,
     fecha: editFecha.value || new Date().toISOString().split("T")[0],
   };
-
   try {
     const res = await fetch(`${API_URL}/transacciones/${transaccionEditando}`, {
       method: "PUT",
@@ -253,97 +217,25 @@ guardarEdicion.onclick = async () => {
       },
       body: JSON.stringify(cambios),
     });
-    if (!res.ok) throw new Error(`Error ${res.status}`);
-
+    if (!res.ok) throw new Error("Error al editar");
     editModal.style.display = "none";
     transaccionEditando = null;
     await cargarTransacciones();
   } catch (err) {
     console.error("Error al editar:", err);
-    alert("No se pudo editar la transacción.");
   }
 };
 
-// --- Graficar Datos ---
-let chart; // un solo gráfico global
-
-function actualizarGraficos() {
-  const ingresos = transacciones
-    .filter((t) => t.Tipo === "ingreso")
-    .reduce((sum, t) => sum + t.Monto, 0);
-  const gastos = transacciones
-    .filter((t) => t.Tipo === "gasto")
-    .reduce((sum, t) => sum + t.Monto, 0);
-
-  const diferencia = ingresos - gastos;
-  diferenciaDiv.textContent = `Diferencia: S/ ${diferencia.toFixed(2)}`;
-
-  const tipoSeleccionado = document.getElementById("graficoSelect").value;
-
-  if (chart) chart.destroy(); // destruye gráfico anterior
-
-  if (tipoSeleccionado === "pie") {
-    chart = new Chart(document.getElementById("chartCanvas"), {
-      type: "pie",
-      data: {
-        labels: ["Ingresos", "Gastos"],
-        datasets: [
-          { data: [ingresos, gastos], backgroundColor: ["#4caf50", "#f44336"] },
-        ],
-      },
-    });
-  } else if (tipoSeleccionado === "bar") {
-    const resumenMensual = agruparPorMes(transacciones);
-    chart = new Chart(document.getElementById("chartCanvas"), {
-      type: "bar",
-      data: {
-        labels: Object.keys(resumenMensual),
-        datasets: [
-          {
-            label: "Ingresos",
-            data: Object.values(resumenMensual).map((v) => v.ingresos),
-            backgroundColor: "#4caf50",
-          },
-          {
-            label: "Gastos",
-            data: Object.values(resumenMensual).map((v) => v.gastos),
-            backgroundColor: "#f44336",
-          },
-        ],
-      },
-    });
-  }
-}
-
-// Cambiar dinámicamente cuando se selecciona otro tipo
-document
-  .getElementById("graficoSelect")
-  .addEventListener("change", actualizarGraficos);
-// --- Agrupar por Mes ---
-function agruparPorMes(transacciones) {
-  const resumen = {};
-  transacciones.forEach((t) => {
-    const mes = t.Fecha.slice(0, 7);
-    if (!resumen[mes]) resumen[mes] = { ingresos: 0, gastos: 0 };
-    resumen[mes][t.Tipo === "ingreso" ? "ingresos" : "gastos"] += t.Monto;
-  });
-  return resumen;
-}
-
-// --- Filtros ---
 [filtroNombre, filtroTipo, filtroFecha].forEach((f) =>
-  f.addEventListener("change", () => {
-    renderTabla();
-    actualizarGraficos();
-  })
+  f.addEventListener("change", () => renderTabla())
 );
 
-// --- Mantener sesión ---
 if (localStorage.getItem("token")) {
   token = localStorage.getItem("token");
   mostrarDashboard();
   cargarTransacciones();
 }
+
 // --- Cerrar sesión manual ---
 cerrarSesionBtn.onclick = () => {
   sessionStorage.setItem("cerradoManual", "true"); // Marcamos que cerró manualmente
