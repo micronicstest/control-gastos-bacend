@@ -8,6 +8,15 @@ const JWT_SECRET = process.env.JWT_SECRET || "clave_super_segura";
 
 const app = express();
 
+// --- Configuración de CORS ---
+const corsOptions = {
+  origin: ["https://control-gastos-bacend.vercel.app"],
+  credentials: true,
+};
+app.use(cors(corsOptions));
+
+app.use(express.json());
+
 // --- Configuración de PostgreSQL ---
 const pool = new Pool({
   host: process.env.DB_HOST,
@@ -15,7 +24,7 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
   port: process.env.DB_PORT || 5432,
-  ssl: { rejectUnauthorized: false }, // Para Supabase
+  ssl: { rejectUnauthorized: false },
 });
 
 pool
@@ -25,9 +34,6 @@ pool
     console.error("❌ Error al conectar con PostgreSQL:", err.message);
     process.exit(1);
   });
-
-app.use(cors());
-app.use(express.json());
 
 // --- Middleware de autenticación ---
 function authenticateToken(req, res, next) {
