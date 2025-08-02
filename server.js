@@ -1,34 +1,30 @@
 const express = require("express");
-const mysql = require("mysql2/promise");
+const { Pool } = require("pg");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
-const path = require("path");
 
 const PORT = process.env.PORT || 8000;
+const JWT_SECRET = process.env.JWT_SECRET || "clave_super_segura";
 
 const app = express();
 
-// --- Configuración de MariaDB ---
-const dbConfig = {
+// --- Configuración de PostgreSQL ---
+const pool = new Pool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 3306,
-};
+  port: process.env.DB_PORT || 5432,
+  ssl: { rejectUnauthorized: false }, // Para Supabase
+});
 
-let db;
-(async () => {
-  try {
-    db = await mysql.createConnection(dbConfig);
-    console.log("✅ Conectado a MariaDB");
-  } catch (err) {
-    console.error("❌ Error al conectar con la base de datos:", err.message);
-    process.exit(1); // Detiene el servidor si no hay conexión
-  }
-})();
-
-const JWT_SECRET = "clave_super_segura";
+pool
+  .connect()
+  .then(() => console.log("✅ Conectado a PostgreSQL"))
+  .catch((err) => {
+    console.error("❌ Error al conectar con PostgreSQL:", err.message);
+    process.exit(1);
+  });
 
 app.use(cors());
 app.use(express.json());
@@ -41,7 +37,7 @@ function authenticateToken(req, res, next) {
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) return res.sendStatus(403);
-    req.user = user; // { id, username, rol }
+    req.user = user;
     next();
   });
 }
@@ -51,17 +47,17 @@ app.post("/login", async (req, res) => {
   const { username, password } = req.body;
 
   try {
-    const [rows] = await db.execute(
-      "SELECT * FROM usuarios WHERE username = ?",
+    const result = await pool.query(
+      "SELECT * FROM usuarios WHERE username = $1",
       [username]
     );
 
-    if (rows.length === 0) {
+    if (result.rows.length === 0) {
       return res.status(401).json({ message: "Credenciales inválidas" });
     }
 
-    const user = rows[0];
-    const isPasswordCorrect = password === user.password; // Comparación simple (texto plano)
+    const user = result.rows[0];
+    const isPasswordCorrect = password === user.password;
 
     if (!isPasswordCorrect) {
       return res.status(401).json({ message: "Credenciales inválidas" });
@@ -84,19 +80,19 @@ app.post("/login", async (req, res) => {
 app.get("/transacciones", authenticateToken, async (req, res) => {
   try {
     let query = `
-      SELECT t.Id, t.Tipo, t.Monto, t.Descripción, t.Fecha, u.username 
+      SELECT t.id, t.tipo, t.monto, t."Descripción", t.fecha, u.username 
       FROM transacciones t 
       JOIN usuarios u ON t.usuario_id = u.id
     `;
     const params = [];
 
     if (req.user.rol !== "admin") {
-      query += " WHERE t.usuario_id = ?";
+      query += " WHERE t.usuario_id = $1";
       params.push(req.user.id);
     }
 
-    const [rows] = await db.execute(query, params);
-    res.json(rows);
+    const result = await pool.query(query, params);
+    res.json(result.rows);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error al obtener transacciones" });
@@ -105,7 +101,6 @@ app.get("/transacciones", authenticateToken, async (req, res) => {
 
 // --- Crear transacción ---
 app.post("/transacciones", authenticateToken, async (req, res) => {
-  // ⛔ Evitar que el admin cree transacciones
   if (req.user.rol === "admin") {
     return res
       .status(403)
@@ -115,26 +110,21 @@ app.post("/transacciones", authenticateToken, async (req, res) => {
   try {
     const { tipo, monto, descripcion, fecha } = req.body;
 
-    const [result] = await db.execute(
-      "INSERT INTO transacciones (usuario_id, Tipo, Monto, Descripción, Fecha) VALUES (?, ?, ?, ?, ?)",
+    const result = await pool.query(
+      `INSERT INTO transacciones (usuario_id, tipo, monto, "Descripción", fecha)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
       [req.user.id, tipo, monto, descripcion, fecha]
     );
 
-    res.status(201).json({
-      Id: result.insertId,
-      Tipo: tipo,
-      Monto: monto,
-      Descripción: descripcion,
-      Fecha: fecha,
-      usuario_id: req.user.id,
-    });
+    res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error al crear transacción" });
   }
 });
 
-// --- Editar transacción (admin no puede) ---
+// --- Editar transacción ---
 app.put("/transacciones/:id", authenticateToken, async (req, res) => {
   if (req.user.rol === "admin") {
     return res
@@ -146,12 +136,14 @@ app.put("/transacciones/:id", authenticateToken, async (req, res) => {
     const { id } = req.params;
     const { tipo, monto, descripcion, fecha } = req.body;
 
-    const [result] = await db.execute(
-      "UPDATE transacciones SET Tipo = ?, Monto = ?, Descripción = ?, Fecha = ? WHERE Id = ? AND usuario_id = ?",
+    const result = await pool.query(
+      `UPDATE transacciones 
+       SET tipo = $1, monto = $2, "Descripción" = $3, fecha = $4 
+       WHERE id = $5 AND usuario_id = $6`,
       [tipo, monto, descripcion, fecha, id, req.user.id]
     );
 
-    if (result.affectedRows === 0) {
+    if (result.rowCount === 0) {
       return res
         .status(404)
         .json({ message: "No se encontró la transacción o no tienes permiso" });
@@ -164,7 +156,7 @@ app.put("/transacciones/:id", authenticateToken, async (req, res) => {
   }
 });
 
-// --- Eliminar transacción (admin no puede) ---
+// --- Eliminar transacción ---
 app.delete("/transacciones/:id", authenticateToken, async (req, res) => {
   if (req.user.rol === "admin") {
     return res
@@ -175,12 +167,12 @@ app.delete("/transacciones/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [result] = await db.execute(
-      "DELETE FROM transacciones WHERE Id = ? AND usuario_id = ?",
+    const result = await pool.query(
+      "DELETE FROM transacciones WHERE id = $1 AND usuario_id = $2",
       [id, req.user.id]
     );
 
-    if (result.affectedRows === 0) {
+    if (result.rowCount === 0) {
       return res
         .status(404)
         .json({ message: "No se encontró la transacción o no tienes permiso" });
