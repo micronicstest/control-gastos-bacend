@@ -82,7 +82,7 @@ app.get("/transacciones", authenticateToken, async (req, res) => {
   try {
     let query = `
       SELECT 
-        t.id, t.tipo, t.monto, t."Descripción" AS descripcion, t.fecha, u.username 
+        t.id, t.tipo, t.monto, t.descripcion, t.fecha, u.username 
       FROM transacciones t 
       JOIN usuarios u ON t.usuario_id = u.id
     `;
