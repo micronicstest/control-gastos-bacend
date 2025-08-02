@@ -10,8 +10,10 @@ const app = express();
 
 // --- Configuración de CORS ---
 const corsOptions = {
-  origin: ["https://control-gastos-bacend.vercel.app"],
+  origin: "*",
   credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  allowedHeaders: ["Content-Type", "Authorization"],
 };
 app.use(cors(corsOptions));
 
