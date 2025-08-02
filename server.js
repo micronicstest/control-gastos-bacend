@@ -19,8 +19,13 @@ const dbConfig = {
 
 let db;
 (async () => {
-  db = await mysql.createConnection(dbConfig);
-  console.log("Conectado a MariaDB");
+  try {
+    db = await mysql.createConnection(dbConfig);
+    console.log("✅ Conectado a MariaDB");
+  } catch (err) {
+    console.error("❌ Error al conectar con la base de datos:", err.message);
+    process.exit(1); // Detiene el servidor si no hay conexión
+  }
 })();
 
 const JWT_SECRET = "clave_super_segura";
