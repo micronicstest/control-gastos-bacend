@@ -8,7 +8,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "clave_super_segura";
 
 const app = express();
 
-// --- Configuración de CORS ---
+// --- CORS ---
 const corsOptions = {
   origin: "https://control-gastos-bacend.vercel.app",
   credentials: true,
@@ -16,10 +16,9 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "Authorization"],
 };
 app.use(cors(corsOptions));
-
 app.use(express.json());
 
-// --- Configuración de PostgreSQL ---
+// --- PostgreSQL ---
 const pool = new Pool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -37,7 +36,7 @@ pool
     process.exit(1);
   });
 
-// --- Middleware de autenticación ---
+// --- Autenticación JWT ---
 function authenticateToken(req, res, next) {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -60,17 +59,11 @@ app.post("/login", async (req, res) => {
       [username]
     );
 
-    if (result.rows.length === 0) {
+    if (result.rows.length === 0 || result.rows[0].password !== password) {
       return res.status(401).json({ message: "Credenciales inválidas" });
     }
 
     const user = result.rows[0];
-    const isPasswordCorrect = password === user.password;
-
-    if (!isPasswordCorrect) {
-      return res.status(401).json({ message: "Credenciales inválidas" });
-    }
-
     const token = jwt.sign(
       { id: user.id, username: user.username, rol: user.rol },
       JWT_SECRET,
@@ -88,7 +81,8 @@ app.post("/login", async (req, res) => {
 app.get("/transacciones", authenticateToken, async (req, res) => {
   try {
     let query = `
-      SELECT t.id, t.tipo, t.monto, t."Descripción", t.fecha, u.username 
+      SELECT 
+        t.id, t.tipo, t.monto, t."Descripción" AS descripcion, t.fecha, u.username 
       FROM transacciones t 
       JOIN usuarios u ON t.usuario_id = u.id
     `;
@@ -121,7 +115,7 @@ app.post("/transacciones", authenticateToken, async (req, res) => {
     const result = await pool.query(
       `INSERT INTO transacciones (usuario_id, tipo, monto, "Descripción", fecha)
        VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
+       RETURNING id, tipo, monto, "Descripción" AS descripcion, fecha`,
       [req.user.id, tipo, monto, descripcion, fecha]
     );
 

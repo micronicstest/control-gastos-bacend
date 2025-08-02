@@ -107,7 +107,7 @@ async function cargarTransacciones() {
     transacciones = await res.json();
     transacciones = transacciones.map((t) => ({
       ...t,
-      Monto: Number(t.Monto) || 0,
+      Monto: Number(t.monto) || 0,
     }));
     // Detectar rol del usuario actual (admin o usuario)
     const payload = JSON.parse(atob(token.split(".")[1]));
@@ -174,13 +174,13 @@ function renderTabla() {
   });
 
   filtradas.forEach((t) => {
-    const fechaFormateada = new Date(t.Fecha).toISOString().split("T")[0];
+    const fechaFormateada = new Date(t.fecha).toISOString().split("T")[0];
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${t.username || "Usuario"}</td>
-      <td>${t.Tipo}</td>
-      <td>S/ ${t.Monto.toFixed(2)}</td>
-      <td>${t.Descripción}</td>
+      <td>${t.tipo}</td>
+      <td>S/ ${t.monto.toFixed(2)}</td>
+      <td>${t.descripcion}</td>
       <td>${fechaFormateada}</td>
       <td>
         ${
