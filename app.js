@@ -96,8 +96,17 @@ async function cargarTransacciones() {
     if (!res.ok) throw new Error(`Error ${res.status}`);
 
     transacciones = await res.json();
+
+    // 🔽 Conversión correcta de campo monto
+    transacciones = transacciones.map((t) => ({
+      ...t,
+      monto: Number(t.monto) || 0,
+    }));
+
     rolUsuario = JSON.parse(atob(token.split(".")[1])).rol;
+
     renderTabla();
+    actualizarGraficos();
   } catch (err) {
     console.error("Error al cargar transacciones:", err);
     if (err.message.includes("401") || err.message.includes("403")) {
@@ -151,7 +160,7 @@ function renderTabla() {
     row.innerHTML = `
       <td>${t.username || "Usuario"}</td>
       <td>${t.tipo}</td>
-      <td>S/ ${t.monto.toFixed(2)}</td>
+      <td>S/ ${Number(t.monto).toFixed(2)}</td>
       <td>${t.descripcion}</td>
       <td>${fecha}</td>
       <td>
