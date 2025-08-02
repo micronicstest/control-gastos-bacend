@@ -88,6 +88,7 @@ function mostrarDashboard() {
   abrirLogin.style.display = "none";
 }
 
+let chart = null;
 // 1️⃣ Función para agrupar transacciones por mes
 function agruparPorMes(transacciones) {
   const resumen = {};
@@ -101,32 +102,30 @@ function agruparPorMes(transacciones) {
 
 // 2️⃣ Función para graficar
 function actualizarGraficos() {
-  const diferenciaDiv = document.getElementById("diferencia");
-  const chartCanvas = document.getElementById("chartCanvas");
-  const tipoSeleccionado =
-    document.getElementById("graficoSelect")?.value || "pie";
-
-  let chart; // si ya tenías una variable global chart, elimina esta
-
   const ingresos = transacciones
     .filter((t) => t.tipo === "ingreso")
-    .reduce((sum, t) => sum + t.monto, 0);
+    .reduce((acc, t) => acc + t.monto, 0);
 
   const gastos = transacciones
     .filter((t) => t.tipo === "gasto")
-    .reduce((sum, t) => sum + t.monto, 0);
+    .reduce((acc, t) => acc + t.monto, 0);
 
   const diferencia = ingresos - gastos;
-  if (diferenciaDiv) {
-    diferenciaDiv.textContent = `Diferencia: S/ ${diferencia.toFixed(2)}`;
+  document.getElementById(
+    "diferencia"
+  ).textContent = `Diferencia: S/ ${diferencia.toFixed(2)}`;
+
+  const tipoSeleccionado = document.getElementById("graficoSelect").value;
+  const canvas = document.getElementById("chartCanvas");
+
+  // 🔽 Solución al error del canvas ya en uso
+  if (chart !== null) {
+    chart.destroy();
+    chart = null;
   }
 
-  if (!chartCanvas) return;
-
-  if (chart) chart.destroy?.();
-
   if (tipoSeleccionado === "pie") {
-    chart = new Chart(chartCanvas, {
+    chart = new Chart(canvas, {
       type: "pie",
       data: {
         labels: ["Ingresos", "Gastos"],
@@ -140,7 +139,8 @@ function actualizarGraficos() {
     });
   } else if (tipoSeleccionado === "bar") {
     const resumenMensual = agruparPorMes(transacciones);
-    chart = new Chart(chartCanvas, {
+
+    chart = new Chart(canvas, {
       type: "bar",
       data: {
         labels: Object.keys(resumenMensual),
