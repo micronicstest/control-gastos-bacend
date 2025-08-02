@@ -88,6 +88,80 @@ function mostrarDashboard() {
   abrirLogin.style.display = "none";
 }
 
+// 1️⃣ Función para agrupar transacciones por mes
+function agruparPorMes(transacciones) {
+  const resumen = {};
+  transacciones.forEach((t) => {
+    const mes = t.fecha.slice(0, 7); // yyyy-mm
+    if (!resumen[mes]) resumen[mes] = { ingresos: 0, gastos: 0 };
+    resumen[mes][t.tipo === "ingreso" ? "ingresos" : "gastos"] += t.monto;
+  });
+  return resumen;
+}
+
+// 2️⃣ Función para graficar
+function actualizarGraficos() {
+  const diferenciaDiv = document.getElementById("diferencia");
+  const chartCanvas = document.getElementById("chartCanvas");
+  const tipoSeleccionado =
+    document.getElementById("graficoSelect")?.value || "pie";
+
+  let chart; // si ya tenías una variable global chart, elimina esta
+
+  const ingresos = transacciones
+    .filter((t) => t.tipo === "ingreso")
+    .reduce((sum, t) => sum + t.monto, 0);
+
+  const gastos = transacciones
+    .filter((t) => t.tipo === "gasto")
+    .reduce((sum, t) => sum + t.monto, 0);
+
+  const diferencia = ingresos - gastos;
+  if (diferenciaDiv) {
+    diferenciaDiv.textContent = `Diferencia: S/ ${diferencia.toFixed(2)}`;
+  }
+
+  if (!chartCanvas) return;
+
+  if (chart) chart.destroy?.();
+
+  if (tipoSeleccionado === "pie") {
+    chart = new Chart(chartCanvas, {
+      type: "pie",
+      data: {
+        labels: ["Ingresos", "Gastos"],
+        datasets: [
+          {
+            data: [ingresos, gastos],
+            backgroundColor: ["#4caf50", "#f44336"],
+          },
+        ],
+      },
+    });
+  } else if (tipoSeleccionado === "bar") {
+    const resumenMensual = agruparPorMes(transacciones);
+    chart = new Chart(chartCanvas, {
+      type: "bar",
+      data: {
+        labels: Object.keys(resumenMensual),
+        datasets: [
+          {
+            label: "Ingresos",
+            data: Object.values(resumenMensual).map((v) => v.ingresos),
+            backgroundColor: "#4caf50",
+          },
+          {
+            label: "Gastos",
+            data: Object.values(resumenMensual).map((v) => v.gastos),
+            backgroundColor: "#f44336",
+          },
+        ],
+      },
+    });
+  }
+}
+
+// 3️⃣ Luego tu función cargarTransacciones
 async function cargarTransacciones() {
   try {
     const res = await fetch(`${API_URL}/transacciones`, {
@@ -268,3 +342,6 @@ if (
   sessionStorage.removeItem("redirected");
   sessionStorage.removeItem("cerradoManual"); // Resetea para próximas veces
 }
+document
+  .getElementById("graficoSelect")
+  .addEventListener("change", actualizarGraficos);
